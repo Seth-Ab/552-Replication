@@ -1,7 +1,6 @@
 \documentclass[12pt]{article}
 
 \usepackage[margin=1in]{geometry}
-\usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{natbib}
@@ -10,9 +9,9 @@
 
 \onehalfspacing
 
-\title{Replicating Table 3 (Fivefold LATE) from Chernozhukov et al.\ (2018)}
+\title{Replication of Table 3 (Fivefold LATE) from Chernozhukov et al.\ (2018)}
 \author{Seth Abramowitz}
-\date{\today}
+\date{June 1, 2026}
 
 \begin{document}
 
@@ -22,79 +21,53 @@
 \small GitHub Repository: \href{https://github.com/Seth-Ab/552-Replication}{https://github.com/Seth-Ab/552-Replication}
 \end{center}
 
-\section{The Original Paper}
+\section{Introduction}
 
-\citet{chernozhukov2018} studies how Double/Debiased Machine Learning can be
-used to estimate causal parameters while allowing flexible machine-learning
-methods in the nuisance-function stage. The paper's central concern is whether
-modern prediction tools can be combined with orthogonal score construction and
-cross-fitting in a way that preserves valid inference for treatment effects.
+This project replicates the fivefold cross-fitting row of Table 3 from \textit{Double/Debiased Machine Learning for Treatment and Structural Parameters} by \citet{chernozhukov2018}. The paper studies how Double Machine Learning (DML) can be used for causal and structural estimation when nuisance functions are learned flexibly with machine learning rather than fixed low-dimensional parametric models.
 
-The application I replicate uses the 1991 SIPP 401(k) data. In that exercise,
-the paper estimates the effect of 401(k) participation on net financial assets
-while treating participation as endogenous and using 401(k) eligibility as an
-instrument. That setting makes Table 3 a natural illustration of the
-interactive instrumental-variables version of Double Machine Learning.
+My specific target is the Local Average Treatment Effect (LATE) of 401(k) participation on net financial assets in the 401(k) application. In this setup, 401(k) participation is the endogenous treatment, 401(k) eligibility is the instrument. The paper uses Double Machine Learning with cross-fitting to estimate this effect while reducing the influence of overfitting in the first-stage models.
 
-\section{The Result of Interest}
+\section{Data}
 
-I replicate the fivefold cross-fitting row of Table 3 from
-\citet{chernozhukov2018}. More specifically, I target the row reporting the
-Local Average Treatment Effect of 401(k) participation on net financial assets
-across the paper's set of nuisance learners. This is the most useful result to
-reproduce because it is the paper's main empirical IV example and because it
-shows whether the qualitative conclusion is robust to different first-stage
-machine-learning choices.
+The data come from the 1991 Survey of Income and Program Participation (SIPP), following the same 401(k) application used in \citet{abadie2003} and \citet{chernozhukov2018}. The outcome variable is household net financial assets, \texttt{net\_tfa}. Two important 401(k) variables appear throughout the analysis: \texttt{e401}, an indicator for whether a household is eligible for a 401(k) plan through an employer, and \texttt{p401}, an indicator for whether the household actually participates in a 401(k) plan. The paper considers both variables because participation is not randomly assigned. While eligibility is determined largely by employer plan availability, participation reflects a household's decision to enroll and may therefore be correlated with unobserved factors related to saving behavior.
 
-\section{Data and Methods}
+In addition to these variables, the analysis includes demographic and financial controls such as age, income, education, family size, marital status, two-earner status, defined-benefit pension status, IRA participation, and home ownership.
 
-The raw data are stored in \texttt{input/sipp1991.dta}, the 1991 SIPP household
-sample used in the DoubleML 401(k) application. The variables used downstream
-are documented in \texttt{input/data\_dictionary.md}. The key variables are net
-financial assets as the outcome, 401(k) participation as the treatment, 401(k)
-eligibility as the instrument, and a set of demographic and financial controls.
+\section{Methods}
 
-The replication pipeline is split into preprocessing and analysis. The script
-\texttt{code/preprocess.py} reads the raw Stata file from \texttt{input/}, keeps
-the variables used in the replication, drops missing values, and writes a
-deterministic analysis-ready file to \texttt{temp/clean\_data.csv}. The script
-\texttt{code/analysis.py} then reads that cleaned file, estimates the IIVM
-specification with fivefold cross-fitting, writes the tracked output tables into
-\texttt{output/tables/}, and prints a console comparison between the published
-row and the replicated row.
+Table 3 estimates a Local Average Treatment Effect (LATE) rather than the Average Treatment Effect (ATE) reported in Table 2. The treatment of interest is actual 401(k) participation, while 401(k) eligibility serves as an instrument for participation. Because participation may be endogenous, the analysis uses an Interactive IV Model (IIVM) rather than the Partially Linear Regression (PLR) framework used for Table 2. The resulting LATE is identified from variation in participation induced by eligibility and therefore applies to households whose participation decisions are affected by 401(k) eligibility.
+
+The replication estimates the IIVM used for the Table 3 LATE analysis:
+\begin{align}
+    Y &= \mu_0(Z, X) + U, \qquad E_P[U \mid Z, X] = 0, \\
+    D &= m_0(Z, X) + V, \qquad E_P[V \mid Z, X] = 0, \\
+    Z &= p_0(X) + \zeta, \qquad E_P[\zeta \mid X] = 0,
+\end{align}
+where $Y$ is net financial assets, $D$ is 401(k) participation, $Z$ is 401(k) eligibility, and $X$ is the vector of controls. The target parameter is the local average treatment effect, identified from the variation in participation generated by eligibility. The nuisance functions $\mu_0(Z, X)$, $m_0(Z, X)$, and $p_0(X)$ capture the relationships needed to construct the orthogonal score for the IIVM estimator. Rather than imposing simple parametric forms on these components, the replication estimates them flexibly with machine learning.
+
+To implement the Table 3 specification, I estimate the nuisance features with several machine learning approaches: Lasso, Regression Tree, Random Forest, Boosting, and Neural Network, alongside the reported Ensemble and Best columns. Estimation then proceeds through fivefold cross-fitting in the IIVM framework, so that each observation's contribution to the LATE estimate is formed using nuisance predictions generated out of sample. This separation between training and estimation is what allows flexible learners to be used without feeding their overfitting directly into the target parameter. The table ultimately summarizes the repeated-split results with the median LATE and the associated standard error measures reported in the paper.
 
 \section{Replication Results}
 
 \input{../output/tables/main_result.tex}
 
-The generated table reports the published targets in Panel A and the replication
-results in Panel B. The main qualitative pattern carries over: the estimated
-LATE remains positive across learners, and the broad magnitudes are comparable
-to the original table. The replication therefore succeeds at reproducing the
-paper's central empirical message even though it does not match every learner
-exactly.
+Table 1 (Panel A) reports the original fivefold IIVM estimates from Chernozhukov et al. (2018) alongside my replication results (Panel B). The table shows the estimated Local Average Treatment Effect (LATE) of 401(k) participation on net financial assets using several different machine learning methods to estimate the nuisance functions. Across all learners, both the published results and my replication produce positive treatment-effect estimates. Substantively, this implies that participation in a 401(k) plan increases household net financial assets for the group of households whose participation decision is affected by 401(k) eligibility.
 
-The remaining discrepancies are plausible given the structure of the exercise.
-Learner-specific tuning choices can move nuisance predictions substantially,
-especially for penalized and neural-network specifications. In addition, even
-when the estimand and cross-fitting structure are aligned, implementation
-details in repeated sample splitting and aggregation can affect the final row.
+The replication captures the main empirical pattern of the original table. Although the estimates are not identical learner by learner, they remain in the same broad range and support the same qualitative conclusion. The closest matches occur for several of the tree-based methods and the Ensemble specification, while larger discrepancies appear for the Lasso and Neural Network results. These differences are not surprising because learner-specific implementation choices can have meaningful effects on the nuisance-function estimates. In particular, the Lasso specification depends heavily on feature construction, interaction terms, and penalty selection, while Neural Networks are naturally sensitive to architecture choices, initialization, and tuning parameters.
 
-\section{What I Learned}
+The Ensemble specification is especially close to the published estimate, differing by less than two percent, which suggests that the replication successfully recovers the overall magnitude of the treatment effect reported in the original study.
 
-The easiest part of the replication was identifying the target result once I
-committed to reproducing only one row instead of the entire paper. The hardest
-part was making the machine-learning nuisance stage stable and reproducible
-across several learners while keeping the full pipeline automated from raw data
-through the final PDF.
+Therefore, this replication supports the central message of Table 3 which is that the estimated effect of 401(k) participation is not driven by any single machine learning method. Despite differences in nuisance estimation, the resulting LATE estimates are consistently positive and economically meaningful. The remaining discrepancies are best interpreted as differences in modeling choices rather than evidence against the paper's substantive finding.
 
-The main lesson from the exercise is that reproducibility depends as much on
-workflow discipline as it does on the estimator itself. A clear directory
-structure, deterministic preprocessing, generated LaTeX fragments, and a real
-Makefile DAG make it much easier for another researcher to understand what was
-done and to rerun the analysis without guessing. If I were the original author,
-the most helpful additional detail would be more explicit documentation of the
-learner tuning and repeated-split aggregation choices used for the final table.
+\section{Challenges in Replication}
+
+The main challenge was model specification and computational cost. Several of the machine learning methods require choices about tuning parameters and model structure, and it is not always clear from the paper exactly how those choices were implemented. This creates uncertainty about whether differences between the replicated and published results reflect substantive methodological differences or simply alternative tuning decisions. In particular, selecting hyperparameters for learners such as Lasso, Random Forests, Boosting, and Neural Networks can meaningfully affect the nuisance estimates and therefore the final DML results.
+
+The computational burden of the replication also slowed the development process. Because the procedure combines repeated sample splitting, fivefold cross-fitting, and multiple machine learning learners, a single run of the full replication can take a substantial amount of time. As a result, testing changes to the specification or debugging implementation details required relatively long iteration cycles, making it more difficult to quickly evaluate alternative modeling choices and identify the sources of discrepancies with the published table.
+
+\section{Takeaways}
+
+Overall, this should be viewed as a successful replication of the core Table 3 purpose. While some quantitative differences remain, the replication preserves the correct LATE estimand, the IIVM framework, the fivefold cross-fitting procedure, and the repeated-split aggregation strategy that are central to the original analysis. Most importantly, it reproduces the paper's primary qualitative conclusion that 401(k) participation has a positive effect on household net financial assets across a variety of machine learning specifications.
 
 \bibliographystyle{apalike}
 \bibliography{references}
