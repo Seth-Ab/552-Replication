@@ -1,0 +1,102 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{hyperref}
+
+\onehalfspacing
+
+\title{Replicating Table 3 (Fivefold LATE) from Chernozhukov et al.\ (2018)}
+\author{Seth Abramowitz}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\small GitHub Repository: \href{https://github.com/Seth-Ab/552-Replication}{https://github.com/Seth-Ab/552-Replication}
+\end{center}
+
+\section{The Original Paper}
+
+\citet{chernozhukov2018} studies how Double/Debiased Machine Learning can be
+used to estimate causal parameters while allowing flexible machine-learning
+methods in the nuisance-function stage. The paper's central concern is whether
+modern prediction tools can be combined with orthogonal score construction and
+cross-fitting in a way that preserves valid inference for treatment effects.
+
+The application I replicate uses the 1991 SIPP 401(k) data. In that exercise,
+the paper estimates the effect of 401(k) participation on net financial assets
+while treating participation as endogenous and using 401(k) eligibility as an
+instrument. That setting makes Table 3 a natural illustration of the
+interactive instrumental-variables version of Double Machine Learning.
+
+\section{The Result of Interest}
+
+I replicate the fivefold cross-fitting row of Table 3 from
+\citet{chernozhukov2018}. More specifically, I target the row reporting the
+Local Average Treatment Effect of 401(k) participation on net financial assets
+across the paper's set of nuisance learners. This is the most useful result to
+reproduce because it is the paper's main empirical IV example and because it
+shows whether the qualitative conclusion is robust to different first-stage
+machine-learning choices.
+
+\section{Data and Methods}
+
+The raw data are stored in \texttt{input/sipp1991.dta}, the 1991 SIPP household
+sample used in the DoubleML 401(k) application. The variables used downstream
+are documented in \texttt{input/data\_dictionary.md}. The key variables are net
+financial assets as the outcome, 401(k) participation as the treatment, 401(k)
+eligibility as the instrument, and a set of demographic and financial controls.
+
+The replication pipeline is split into preprocessing and analysis. The script
+\texttt{code/preprocess.py} reads the raw Stata file from \texttt{input/}, keeps
+the variables used in the replication, drops missing values, and writes a
+deterministic analysis-ready file to \texttt{temp/clean\_data.csv}. The script
+\texttt{code/analysis.py} then reads that cleaned file, estimates the IIVM
+specification with fivefold cross-fitting, writes the tracked output tables into
+\texttt{output/tables/}, and prints a console comparison between the published
+row and the replicated row.
+
+\section{Replication Results}
+
+\input{../output/tables/main_result.tex}
+
+The generated table reports the published targets in Panel A and the replication
+results in Panel B. The main qualitative pattern carries over: the estimated
+LATE remains positive across learners, and the broad magnitudes are comparable
+to the original table. The replication therefore succeeds at reproducing the
+paper's central empirical message even though it does not match every learner
+exactly.
+
+The remaining discrepancies are plausible given the structure of the exercise.
+Learner-specific tuning choices can move nuisance predictions substantially,
+especially for penalized and neural-network specifications. In addition, even
+when the estimand and cross-fitting structure are aligned, implementation
+details in repeated sample splitting and aggregation can affect the final row.
+
+\section{What I Learned}
+
+The easiest part of the replication was identifying the target result once I
+committed to reproducing only one row instead of the entire paper. The hardest
+part was making the machine-learning nuisance stage stable and reproducible
+across several learners while keeping the full pipeline automated from raw data
+through the final PDF.
+
+The main lesson from the exercise is that reproducibility depends as much on
+workflow discipline as it does on the estimator itself. A clear directory
+structure, deterministic preprocessing, generated LaTeX fragments, and a real
+Makefile DAG make it much easier for another researcher to understand what was
+done and to rerun the analysis without guessing. If I were the original author,
+the most helpful additional detail would be more explicit documentation of the
+learner tuning and repeated-split aggregation choices used for the final table.
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}
