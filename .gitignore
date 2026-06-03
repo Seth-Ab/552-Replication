@@ -1,0 +1,13 @@
+temp/
+.vscode/
+__pycache__/
+*.pyc
+.Rhistory
+.RData
+*.aux
+*.log
+*.out
+*.toc
+*.blg
+*.bbl
+.DS_Store
