@@ -16,8 +16,6 @@ The final output of the project is:
 - `paper/paper.tex`: LaTeX source for the write-up
 - `paper/paper.pdf`: final compiled paper
 
-Files such as `code/preprocess.py`, `code/analysis.py`, and `complex.py` are not used by the main `Makefile` workflow for the final paper.
-
 ## Replication Process
 
 The build pipeline is:
